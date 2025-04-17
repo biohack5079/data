@@ -11,8 +11,7 @@ class Simulation:
     def initialize_organoid(self):
         from organoid import Organoid
         self.organoid = Organoid(self.num_cells)
-        self.organoid.initialize()  # 修正: initialize_cells -> initialize
-
+        self.organoid.initialize() 
     def run(self):
         print("Simulation is running")
         self.initialize_organoid()
