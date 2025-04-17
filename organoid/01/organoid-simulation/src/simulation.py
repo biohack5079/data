@@ -22,7 +22,7 @@ class Simulation:
     def get_results(self):
         return self.data
 
-# 以下を追加
+
 if __name__ == "__main__":
     sim = Simulation(num_cells=10, time_steps=100, time_interval=0.1)
     sim.run()
