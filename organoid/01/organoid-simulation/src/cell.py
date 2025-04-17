@@ -40,7 +40,7 @@ class Cell:
 
         # 安全な指数関数の計算
         def safe_exp(x):
-            return np.exp(np.clip(x, -50, 50))  # xを-100から100の範囲に制限
+            return np.exp(np.clip(x, -100, 100))  # xを-100から100の範囲に制限
         
         dV = (I - g_Na * m**3 * h * (V - E_Na) - g_K * n**4 * (V - E_K) - g_L * (V - E_L)) / C
         dm = 0.1 * (25 - V) / (safe_exp((25 - V) / 10) - 1) * (1 - m) - 4 * safe_exp(-V / 18) * m
