@@ -1,1 +1,6 @@
 source .venv/bin/activate
+
+git status
+git add .
+git commit -m "changed"
+git push origin main
