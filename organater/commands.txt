@@ -1,0 +1,22 @@
+source ../.venv/bin/activate
+cd python_scripts/
+
+
+# 1. カスタムモジュールへのパスを設定
+# nest_module/build に libnest_module.so が存在することを前提とします。
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/nest_module/build
+
+# 2. Pythonスクリプトの実行
+python python_scripts/simulation.py
+
+
+
+# Git操作
+
+git status
+
+git add .
+
+git commit -m "changed"
+
+git push origin main
