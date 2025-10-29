@@ -1,21 +1,57 @@
+# organater/nest_module/CMakeLists.txt (最終ビルド成功を目指す版 V8)
+
 cmake_minimum_required(VERSION 3.5)
-# 💡 library_nameを 'nest_module' に設定
 project(nest_module CXX)
 
-find_package(NEST QUIET)
-if (NOT NEST_FOUND)
-    message(FATAL_ERROR "Could not find NEST. Make sure NEST is built and installed.")
-endif()
+# =========================================================================
+# 🚨 最終回避策の定義 (パスは固定)
+# =========================================================================
 
-include(NestModule)
+# NESTのインストールパスを定義
+set(NEST_INSTALL_PREFIX "/home/s24156/data/.venv")
+set(NEST_SOURCE_DIR "/home/s24156/data/nest-simulator")
+set(MODULE_ROOT_DIR "/home/s24156/data/organater/nest_module")
 
-# 💡 ソースファイルをここで定義
-set(MY_MODULE_SOURCES
+# -------------------------------------------------------------
+# NESTのヘッダーとライブラリへの絶対パスを直接指定
+# -------------------------------------------------------------
+
+# ヘッダーファイルパスを設定
+include_directories(
+  SYSTEM
+  ${NEST_INSTALL_PREFIX}/include/nest  # 1. インストールされたNESTのヘッダー
+  
+  # 💡 NESTのソースヘッダーへの最終調整パス (V8: 全てを含める)
+  ${NEST_SOURCE_DIR}                   # 2. ソースルート (lib/ や models/ の親)
+  ${NEST_SOURCE_DIR}/lib               # 3. <lib/...> を解決するため
+  ${NEST_SOURCE_DIR}/models            # 4. ⬅️ <models/...> を解決するため
+  ${NEST_SOURCE_DIR}/nestkernel        # 5. nestkernel内のコアヘッダーを網羅
+  
+  # 💡 カスタムモジュールのヘッダーへのパス
+  ${MODULE_ROOT_DIR}                   # module.h があるパス
+  ${MODULE_ROOT_DIR}/models            # local_learning_synapse.h があるパス
+)
+
+# 💡 共有モジュールライブラリの定義
+add_library(nest_module MODULE
     module.cpp
     models/local_learning_synapse.cpp
 )
 
-add_nest_module(
-    library_name nest_module
-    sources ${MY_MODULE_SOURCES}
+# 必要なNESTライブラリへの絶対パスリンク (仮想環境内のファイル)
+target_link_libraries(nest_module PUBLIC
+    ${NEST_INSTALL_PREFIX}/lib/nest/libnestkernel.so
+    ${NEST_INSTALL_PREFIX}/lib/nest/libmodels.so
+    ${NEST_INSTALL_PREFIX}/lib/nest/libnest.so
+)
+
+# C++規格を指定
+target_compile_features(nest_module PUBLIC cxx_std_17)
+
+# 共有ライブラリのrpathを設定
+set_target_properties(nest_module PROPERTIES
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH "${NEST_INSTALL_PREFIX}/lib/nest"
+    INSTALL_RPATH_USE_ORIGIN TRUE
+    SKIP_INSTALL_RPATH FALSE
 )

@@ -1,3 +1,4 @@
+cd organater
 source ../.venv/bin/activate
 cd python_scripts/
 
@@ -9,6 +10,17 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/nest_module/build
 # 2. Pythonスクリプトの実行
 python python_scripts/simulation.py
 
+
+
+
+# 1. ビルドディレクトリに移動
+cd ~/data/organater/nest_module/build
+
+# 2. CMAKE_PREFIX_PATHを指定してcmakeを実行
+cmake -DCMAKE_PREFIX_PATH=/home/s24156/data/.venv ..
+
+# 3. コンパイル
+make
 
 
 # Git操作

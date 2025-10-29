@@ -1,0 +1,3 @@
+/home/s24156/data/organater/nest_module/build/CMakeFiles/nest_module.dir
+/home/s24156/data/organater/nest_module/build/CMakeFiles/edit_cache.dir
+/home/s24156/data/organater/nest_module/build/CMakeFiles/rebuild_cache.dir

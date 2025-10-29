@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                // 1. NEST本体のソースコードのパス (models, nestkernelなど)
+                "/home/s24156/data/nest-simulator/models",
+                "/home/s24156/data/nest-simulator/nestkernel",
+                "/home/s24156/data/nest-simulator/libnestutil",
+                
+                // 2. NESTのインストールヘッダー（仮想環境のincludeディレクトリ）
+                "/home/s24156/data/.venv/include",
+                
+                // 3. カスタムモジュールのヘッダーパス
+                "${workspaceFolder}/nest_module"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
