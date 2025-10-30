@@ -1,1 +1,9 @@
 python -m http.server 8000
+
+
+モデルが無い場合
+
+ollama list
+llama pull gpt-oss:20b
+llama run gpt-oss:20b "こんにちは、自己紹介してください"
+ollama serve
