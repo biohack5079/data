@@ -19,16 +19,12 @@
   <input type="file" id="fileInput" accept=".txt" multiple>
   <div id="fileContent">【ここに読み込まれた文書の内容が表示されます】</div>
 
-  <label for="pasteArea">貼り付けエリア:</label>
-  <textarea id="pasteArea" placeholder="ここにテキストを貼り付けてください..."></textarea>
-
   <textarea id="userInput" placeholder="質問を入力してください..."></textarea>
   <br>
   <label for="modelSelect">モデル選択:</label>
   <select id="modelSelect">
     <option value="gemma:7b">Gemma 7B</option>
     <option value="gpt-oss:20b">GPT-OSS 20B</option>
-    <option value="gemma3:12b">Gemma 12B</option>
   </select>
   <br>
   <button id="sendButton">送信</button>
@@ -88,7 +84,6 @@
     async function sendToModel() {
       const userInputElement = document.getElementById('userInput');
       const userInput = userInputElement.value.trim();
-      const pasteArea = document.getElementById('pasteArea').value.trim();
       const chatLog = document.getElementById('chatLog');
       const sendButton = document.getElementById('sendButton');
       const modelSelect = document.getElementById('modelSelect').value;
@@ -96,11 +91,6 @@
       if (!userInput) {
         alert("質問を入力してください。");
         return;
-      }
-
-      // 貼り付けテキストをdocumentsに追加
-      if (pasteArea) {
-        documents.push({ name: '貼り付けテキスト', content: pasteArea });
       }
 
       sendButton.disabled = true;
