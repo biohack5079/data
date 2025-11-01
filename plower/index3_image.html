@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>RAGベース NotebookLM風ローカルアプリ「plower」</title>
-    <script src='https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js'></script>
     <style>
         body {
             font-family: sans-serif;
@@ -19,13 +18,13 @@
             margin-top: 10px;
             border: 1px solid #ccc;
             min-height: 50px;
-            max-height: 250px;
+            max-height: 250px; /* 画像表示のために高さを少し広げる */
             overflow-y: auto;
         }
         
         /* 貼り付けエリア */
         #pasteArea {
-            height: 50px;
+            height: 50px; /* 画像貼り付けスペース確保のため、少し小さく */
         }
         
         /* 入力系 */
@@ -96,14 +95,6 @@
             margin-top: 5px;
             display: block;
         }
-        
-        /* OCRステータス表示 */
-        .ocr-status {
-            font-weight: bold;
-            padding: 5px 0;
-            border-bottom: 1px dashed #ccc;
-            margin-bottom: 5px;
-        }
     </style>
 </head>
 <body>
@@ -114,81 +105,46 @@
     <div id="fileContent">【ここに読み込まれた文書の内容や貼り付けた画像が表示されます】</div>
 
     <label for="pasteArea">一時的なRAGコンテキストとしてテキストまたは画像を貼り付け:</label>
-    <textarea id="pasteArea" placeholder="ここにテキストを貼り付けてください。Ctrl+Vで画像を貼り付けるとOCR処理が開始されます。"></textarea>
+    <textarea id="pasteArea" placeholder="ここにテキストを貼り付けてください。Ctrl+Vで画像を貼り付けることもできます。"></textarea>
 
     <label for="userInput">質問を入力:</label>
     <textarea id="userInput" placeholder="質問を入力してください..."></textarea>
     
     <label for="modelSelect">モデル選択:</label>
-<select id="modelSelect">
-    <option value="gpt-oss:20b" selected>GPT-OSS 20B (ローカル - 13GB)</option>
-    
-    <option value="gpt-oss-20b:latest">GPT-OSS 20B (旧 - 11GB)</option>
-    
-    <option value="gemma:7b">Gemma 7B (動作推奨)</option>
-    <option value="gemma3:12b">Gemma 3 12B</option>
-    
-    <option value="llama3:8b">Llama 3 8B</option>
-    <option value="gpt-oss-120b">GPT-OSS 120B (非現実的)</option>
-</select>
+    <select id="modelSelect">
+        <option value="gpt-oss-20b-local" selected>GPT-OSS 20B (ローカル)</option>
+        <option value="gemma:7b">Gemma 7B</option>
+        <option value="llama3:8b">Llama 3 8B</option>
+        <option value="gpt-oss-120b">GPT-OSS 120B (要超高性能GPU)</option>
+    </select>
     
     <button id="sendButton">送信</button>
     
     <div id="chatLog"></div>
 
     <script>
-        // ファイル入力で読み込まれた文書を格納
+        // ファイル入力で読み込まれた文書を格納する配列
         let fileDocuments = [];
-        // 貼り付け画像からOCR処理で生成された文書を格納（RAG対象）
-        let ocrDocuments = []; 
-        
-        // Tesseract Workerを初期化（OCR処理用）
-        let worker;
-
-        // --- Tesseract.js OCR処理関数 ---
-        async function runOcrOnImage(base64Image, statusElement) {
-            if (!worker) {
-                // 初回実行時のみWorkerを作成（日本語言語ファイルをロード）
-                statusElement.textContent = 'OCRワーカーを初期化中... (初回のみ時間がかかります)';
-                worker = await Tesseract.createWorker({
-                    logger: m => {
-                        if (m.status === 'recognizing text' && m.progress) {
-                            statusElement.textContent = `OCR処理中: ${Math.round(m.progress * 100)}%`;
-                        } else if (m.status) {
-                            statusElement.textContent = `OCRステータス: ${m.status}`;
-                        }
-                    },
-                });
-                // 日本語と英語の言語ファイルをロード
-                await worker.loadLanguage('jpn+eng');
-                await worker.initialize('jpn+eng');
-                statusElement.textContent = 'OCRワーカーの初期化完了。テキスト認識中...';
-            }
-
-            // OCR実行
-            const { data: { text } } = await worker.recognize(base64Image);
-            
-            return text;
-        }
-
+        // 貼り付け画像から生成された文書を格納する配列
+        let imageDocuments = []; 
 
         // --- ファイル入力のイベントリスナー ---
         document.getElementById('fileInput').addEventListener('change', function () {
             const files = this.files;
-            fileDocuments = []; 
+            fileDocuments = []; // ファイル文書をリセット
             let displayText = '';
             const fileContentDiv = document.getElementById('fileContent');
             
-            // 既存の画像コンテンツを一時的に取得
-            const existingImageContent = fileContentDiv.querySelectorAll('img, .ocr-status');
+            // 既存のファイル内容と画像表示をクリア
             fileContentDiv.innerHTML = 'ファイルを読み込み中です...'; 
-            existingImageContent.forEach(el => fileContentDiv.appendChild(el));
+            // 貼り付け画像は残すロジックに変更することも可能だが、今回はクリア
 
             const fileReads = Array.from(files).map(file => {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = function (e) {
                         fileDocuments.push({ name: file.name, content: e.target.result });
+                        // 既存のファイル内容表示に追加
                         displayText += `【${file.name}】\n` + e.target.result.slice(0, 300) + '...\n\n';
                         resolve();
                     };
@@ -200,71 +156,47 @@
             Promise.all(fileReads)
                 .then(() => {
                     // ファイル内容の表示を更新（画像はそのまま残る）
-                    fileContentDiv.insertAdjacentHTML('afterbegin', (displayText || 'ファイルが選択されていません。'));
+                    fileContentDiv.innerHTML = (displayText || 'ファイルが選択されていません。') + fileContentDiv.innerHTML.split('【ここに読み込まれた文書の内容や貼り付けた画像が表示されます】').pop();
                 })
                 .catch(error => {
-                    fileContentDiv.insertAdjacentHTML('afterbegin', 'ファイルの読み込み中にエラーが発生しました。');
+                    fileContentDiv.innerHTML = 'ファイルの読み込み中にエラーが発生しました。';
                     console.error("File reading error:", error);
                 });
         });
         
-        // --- 貼り付け画像処理のイベントリスナー (OCR連携ロジック) ---
-        document.getElementById('pasteArea').addEventListener('paste', async function (e) {
+        // --- 貼り付け画像処理のイベントリスナー (新規追加) ---
+        document.getElementById('pasteArea').addEventListener('paste', function (e) {
             const items = e.clipboardData.items;
             let imageFound = false;
             
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
                 if (item.type.indexOf('image') !== -1) {
-                    e.preventDefault(); 
+                    e.preventDefault(); // テキストエリアへの画像の貼り付けを阻止
                     const blob = item.getAsFile();
                     const reader = new FileReader();
-                    imageFound = true;
-
-                    // 処理中メッセージ表示要素
-                    const processingMessage = document.createElement('p');
-                    processingMessage.className = 'ocr-status';
-                    processingMessage.textContent = '画像を貼り付けました。OCR処理を開始しています...';
-                    processingMessage.style.color = 'orange';
-                    document.getElementById('fileContent').prepend(processingMessage);
-
-                    reader.onload = async function (event) {
-                        const base64Image = event.target.result;
-                        const imageName = `貼り付け画像_${Date.now()}`;
-                        
+                    
+                    reader.onload = function (event) {
                         // 画像をfileContentエリアに表示
                         const img = document.createElement('img');
-                        img.src = base64Image;
-                        img.alt = imageName;
-                        document.getElementById('fileContent').prepend(img);
+                        img.src = event.target.result;
+                        document.getElementById('fileContent').appendChild(img);
                         
-                        try {
-                            // 1. OCR処理を実行
-                            const ocrText = await runOcrOnImage(base64Image, processingMessage);
-                            
-                            // 2. OCR結果をRAG文書に追加
-                            const fullOcrContent = `【OCR結果 - ${imageName}】\n${ocrText.trim()}`;
-                            ocrDocuments.push({
-                                name: imageName,
-                                content: fullOcrContent
-                            });
-                            
-                            // 3. ステータス更新
-                            processingMessage.textContent = `OCR処理完了: ${imageName} のテキストがRAG対象に追加されました。抽出テキストの最初の50文字: ${ocrText.trim().slice(0, 50)}...`;
-                            processingMessage.style.color = 'green';
-                            
-                        } catch (error) {
-                            processingMessage.textContent = `OCR処理中にエラーが発生しました: ${error.message}`;
-                            processingMessage.style.color = 'red';
-                            console.error("OCR Error:", error);
-                        } finally {
-                            // pasteAreaのテキストをクリア
-                            document.getElementById('pasteArea').value = '';
-                        }
+                        // 仮の文書として追加（OCR未対応）
+                        imageDocuments.push({
+                            name: `貼り付け画像_${Date.now()}`,
+                            content: '[画像が貼り付けられました。OCR未対応のため、現在のところ、この画像はRAG検索には使用されません。]'
+                        });
+                        alert("画像が読み込まれました。現在は表示のみで、RAG検索には使用されません。");
                     };
                     reader.readAsDataURL(blob);
-                    break;
+                    imageFound = true;
+                    break; // 複数の画像がある場合は最初のものだけ処理
                 }
+            }
+            if (imageFound) {
+                // テキストエリアのテキストを消去しないようにする（画像とテキストの同時貼り付けに対応）
+                // ただし、画像はfileContentに、テキストはpasteAreaに残る
             }
         });
 
@@ -309,8 +241,8 @@
             responseParagraph.innerHTML = '<strong>回答:</strong> ';
             chatLog.appendChild(responseParagraph);
 
-            // RAGの対象となる全ドキュメントリストを作成: ファイル、OCR結果、貼り付けテキストの順
-            let allDocuments = [...fileDocuments, ...ocrDocuments];
+            // RAGの対象となる全ドキュメントリストを作成
+            let allDocuments = [...fileDocuments, ...imageDocuments];
             if (pasteAreaContent) {
                 // 貼り付けエリアのテキスト内容を一時的なドキュメントとして追加
                 allDocuments.push({ name: '貼付けテキスト', content: pasteAreaContent });
@@ -331,7 +263,7 @@ ${context}
 
 質問: ${userInput}`;
 
-            const numCtx = 4096;
+            const numCtx = 4096; // 多くのモデルの標準的なコンテキストサイズ
 
             let result = '';
             try {
