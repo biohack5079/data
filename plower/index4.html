@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -121,12 +120,17 @@
     <textarea id="userInput" placeholder="質問を入力してください..."></textarea>
     
     <label for="modelSelect">モデル選択:</label>
-    <select id="modelSelect">
-        <option value="gpt-oss:20b" selected>GPT-OSS 20B</option>
-        <option value="gemma:7b">Gemma 7B</option>
-        <option value="gpt-oss-20b:latest">GPT-OSS 20B (旧)</option>
-        <option value="gemma3:12b">Gemma 3 12B</option>
-    </select>
+<select id="modelSelect">
+    <option value="gpt-oss:20b" selected>GPT-OSS 20B (ローカル - 13GB)</option>
+    
+    <option value="gpt-oss-20b:latest">GPT-OSS 20B (旧 - 11GB)</option>
+    
+    <option value="gemma:7b">Gemma 7B (動作推奨)</option>
+    <option value="gemma3:12b">Gemma 3 12B</option>
+    
+    <option value="llama3:8b">Llama 3 8B</option>
+    <option value="gpt-oss-120b">GPT-OSS 120B (要超高性能GPU)</option>
+</select>
     
     <button id="sendButton">送信</button>
     
@@ -327,8 +331,7 @@ ${context}
 
 質問: ${userInput}`;
 
-            // gpt-oss:20bを使う場合、コンテキストサイズを大きく設定
-            const numCtx = (modelSelect.includes('20b')) ? 8192 : 4096;
+            const numCtx = 4096;
 
             let result = '';
             try {
@@ -346,8 +349,7 @@ ${context}
                     })
                 });
 
-                if (!response.ok) throw new Error(`Ollamaサーバーエラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} がロードできませんでした。`);
-
+                if (!response.ok) throw new Error(`Ollamaサーバーエラー: ${response.status} ${response.statusText}. モデル名: ${modelSelect} がローカルにインストールされているか確認してください。`);
                 if (!response.body) throw new Error("Ollamaサーバーから応答ボディがありません。");
 
                 const reader = response.body.getReader();
