@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -121,10 +122,10 @@
     
     <label for="modelSelect">モデル選択:</label>
     <select id="modelSelect">
-        <option value="gemma:7b">Gemma 7B</option>
         <option value="gpt-oss:20b" selected>GPT-OSS 20B</option>
-        <option value="gemma3:12b">Gemma 12B</option>
-        <option value="gpt-oss:120b">GPT-OSS 120B</option>
+        <option value="gemma:7b">Gemma 7B</option>
+        <option value="gpt-oss-20b:latest">GPT-OSS 20B (旧)</option>
+        <option value="gemma3:12b">Gemma 3 12B</option>
     </select>
     
     <button id="sendButton">送信</button>
@@ -136,8 +137,6 @@
         let fileDocuments = [];
         // 貼り付け画像からOCR処理で生成された文書を格納（RAG対象）
         let ocrDocuments = []; 
-        // 貼り付けエリアのテキスト文書を格納（RAG対象）
-        let pasteTextDocument = null; 
         
         // Tesseract Workerを初期化（OCR処理用）
         let worker;
@@ -176,16 +175,10 @@
             let displayText = '';
             const fileContentDiv = document.getElementById('fileContent');
             
-            // 既存の画像コンテンツとOCRステータスを一時的に取得
-            const existingContent = Array.from(fileContentDiv.children);
+            // 既存の画像コンテンツを一時的に取得
+            const existingImageContent = fileContentDiv.querySelectorAll('img, .ocr-status');
             fileContentDiv.innerHTML = 'ファイルを読み込み中です...'; 
-            
-            // 既存の画像とOCRステータスを再挿入
-            existingContent.forEach(el => {
-                if (el.tagName === 'IMG' || el.classList.contains('ocr-status')) {
-                    fileContentDiv.appendChild(el);
-                }
-            });
+            existingImageContent.forEach(el => fileContentDiv.appendChild(el));
 
             const fileReads = Array.from(files).map(file => {
                 return new Promise((resolve, reject) => {
@@ -202,7 +195,7 @@
 
             Promise.all(fileReads)
                 .then(() => {
-                    // ファイル内容の表示を更新
+                    // ファイル内容の表示を更新（画像はそのまま残る）
                     fileContentDiv.insertAdjacentHTML('afterbegin', (displayText || 'ファイルが選択されていません。'));
                 })
                 .catch(error => {
@@ -223,9 +216,6 @@
                     const blob = item.getAsFile();
                     const reader = new FileReader();
                     imageFound = true;
-
-                    // 既存のOCR関連要素をクリア
-                    document.querySelectorAll('#fileContent img, #fileContent .ocr-status').forEach(el => el.remove());
 
                     // 処理中メッセージ表示要素
                     const processingMessage = document.createElement('p');
@@ -248,8 +238,7 @@
                             // 1. OCR処理を実行
                             const ocrText = await runOcrOnImage(base64Image, processingMessage);
                             
-                            // 2. OCR結果をRAG文書に追加（既存のOCR結果をクリアして新しいものに置き換え）
-                            ocrDocuments = [];
+                            // 2. OCR結果をRAG文書に追加
                             const fullOcrContent = `【OCR結果 - ${imageName}】\n${ocrText.trim()}`;
                             ocrDocuments.push({
                                 name: imageName,
@@ -315,14 +304,12 @@
             const responseParagraph = document.createElement('p');
             responseParagraph.innerHTML = '<strong>回答:</strong> ';
             chatLog.appendChild(responseParagraph);
-            
-            // 貼り付けエリアのテキスト内容を一時的なドキュメントとして追加（質問ごとに内容を更新）
-            pasteTextDocument = pasteAreaContent ? { name: '貼付けテキスト', content: pasteAreaContent } : null;
 
             // RAGの対象となる全ドキュメントリストを作成: ファイル、OCR結果、貼り付けテキストの順
             let allDocuments = [...fileDocuments, ...ocrDocuments];
-            if (pasteTextDocument) {
-                allDocuments.push(pasteTextDocument);
+            if (pasteAreaContent) {
+                // 貼り付けエリアのテキスト内容を一時的なドキュメントとして追加
+                allDocuments.push({ name: '貼付けテキスト', content: pasteAreaContent });
             }
 
             // RAGコンテキストの生成
@@ -340,8 +327,8 @@ ${context}
 
 質問: ${userInput}`;
 
-            // コンテキストサイズの設定: 20B/12B/120Bは8192、それ以外は4096
-            const numCtx = (modelSelect.includes('20b') || modelSelect.includes('12b') || modelSelect.includes('120b')) ? 8192 : 4096;
+            // gpt-oss:20bを使う場合、コンテキストサイズを大きく設定
+            const numCtx = (modelSelect.includes('20b')) ? 8192 : 4096;
 
             let result = '';
             try {
