@@ -7,3 +7,32 @@ ollama list
 llama pull gpt-oss:20b
 llama run gpt-oss:20b "こんにちは、自己紹介してください"
 ollama serve
+
+
+
+3. 実行手順
+1. サーバー環境の準備
+Bash
+
+# plowerフォルダに移動
+cd ~/data/plower
+
+# 仮想環境を作成（推奨）
+python3 -m venv venv
+source venv/bin/activate
+
+# 必要なライブラリをインストール
+pip install -r requirements.txt
+2. APIキーの設定
+~/data/plower/app/.envファイルを作成し、ご自身のGemini APIキーを記述します。
+
+3. バックエンドサーバーの起動
+Bash
+
+# バックエンドサーバーを起動 (FastAPIのデフォルトポート8000)
+cd app
+uvicorn main:app --reload --port 8000
+4. フロントエンドの実行
+サーバーが起動したら、~/data/plower/index.html（またはあなたがメインで使用するHTMLファイル）をWebブラウザで開きます（Live Serverなどの拡張機能を使うと便利です。通常ポートは5500など）。
+
+これで、HTML/JSからhttp://localhost:8000/api/gemini_proxy経由で、安全にGemini 1.5 Pro/Flashを利用できる環境が整います。

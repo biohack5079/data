@@ -1,0 +1,12 @@
+# ~/data/plower/.gitignore
+
+# Python
+__pycache__/
+*.pyc
+
+# 環境変数 (🔑 APIキーを含むため絶対に除外！)
+/app/.env
+
+# Python環境
+venv/
+.venv/
