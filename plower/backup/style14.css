@@ -2,36 +2,12 @@ body {
     font-family: sans-serif;
     margin: 20px;
     line-height: 1.6;
-    color: #333;
+    color: #333; /* <-- 修正: セミコロンを追加 */
 }
-
-/* --- RAGコントロールヘッダーの修正スタイル (レイアウト崩れ対策) --- */
-.rag-controls-header {
-    display: flex; /* 要素を横並びにする */
-    align-items: center; /* 垂直方向の中央揃え */
-    gap: 15px; /* 要素間の間隔 */
-    margin-top: 20px; /* H1からの間隔を確保 */
-    margin-bottom: 20px; /* 次のセクションとの間隔 */
-}
-
-/* rag-controls-header内のラベルは、Flexboxで位置を揃えるため、標準のmarginをリセット */
-.rag-controls-header label {
-    margin-top: 0;
-}
-
-/* リセットボタンのスタイルも、Flexbox制御のためにマージンをリセット */
-#resetDocsButton {
-    background-color: #dc3545; /* 赤色 */
-    padding: 8px 15px;
-    margin-left: 0; 
-    margin-top: 0; 
-}
-/* ------------------------------------------------------------- */
-
 
 /* 全体のコンテナ */
 .rag-source-container {
-    display: flex;
+    display: flex; /* <-- 修正: セミコロンを追加 */
     gap: 20px;
     margin-top: 10px;
 }
@@ -136,7 +112,13 @@ button {
     background-color: #007BFF;
 }
 
-/* 注意: #resetDocsButtonのスタイルは上でrag-controls-headerに対応済み */
+/* リセットボタンのスタイル */
+#resetDocsButton {
+    background-color: #dc3545; /* 赤色 */
+    padding: 8px 15px;
+    margin-left: 10px;
+    margin-top: 5px;
+}
 
 button:disabled {
     background-color: #aaa;
@@ -177,7 +159,7 @@ button:disabled {
     padding: 5px 0;
     border-bottom: 1px dashed #ccc;
     margin-bottom: 5px;
-    color: orange;
+    color: orange; /* <-- 修正: セミコロンを追加 */
     /* ローディングインジケータ（シンプル版） */
     display: flex;
     align-items: center;
@@ -197,3 +179,5 @@ button:disabled {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+
