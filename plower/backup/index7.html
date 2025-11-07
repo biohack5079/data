@@ -108,7 +108,7 @@
         }
         
         #saveOcrButton {
-              background-color: #007BFF;
+             background-color: #007BFF;
         }
 
         button:disabled {
@@ -189,6 +189,9 @@
     <option value="gemini-1.5-flash">Gemini 1.5 Flash (クラウド)</option>
     <option value="gemini-1.5-pro">Gemini 1.5 Pro (クラウド)</option>
 </select>
+
+
+
     
     <button id="sendButton">送信</button>
     
@@ -204,12 +207,6 @@
         let worker;
         
         const PREVIEW_MAX_DOCS = 5; // コンテンツ表示エリアに表示する最大ファイル数
-
-        // クラウド（Gemini API）モデルのリストを定義 (モデル判別に利用)
-        const GEMINI_MODELS = [
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
-        ];
 
         // --- LocalStorageからの文書ロードとファイル一覧の表示 ---
         function loadDocuments() {
@@ -292,8 +289,7 @@
                         }
                     },
                 });
-                // 言語設定は tesseract.js のダウンロード状況によるが、今回は汎用的な jpn+eng を使用
-                await worker.loadLanguage('jpn+eng'); 
+                await worker.loadLanguage('jpn+eng');
                 await worker.initialize('jpn+eng');
                 statusElement.textContent = 'OCRワーカーの初期化完了。テキスト認識中...';
             }
@@ -406,8 +402,6 @@
         });
         
         // --- 独自追加機能: OCR/貼付テキストのファイル保存と永続化 ---
-        document.getElementById('saveOcrButton').addEventListener('click', saveOcrTextAsFile);
-
         function saveOcrTextAsFile() {
             const allTextDocuments = [...ocrDocuments];
             const pasteAreaContent = document.getElementById('pasteArea').value.trim();
@@ -423,9 +417,7 @@
 
             // 1. LocalStorageに永続化 (ファイル名を付けて persistentDocuments に追加)
             const now = new Date();
-            // ファイル名生成 (例: plower_memo_20251107_85516.txt)
-            const pad = (num) => num.toString().padStart(2, '0');
-            const filename = `plower_memo_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.txt`;
+            const filename = `plower_memo_${now.getFullYear()}${now.getMonth() + 1}${now.getDate()}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.txt`;
             
             let contentToSave = '';
             allTextDocuments.forEach(doc => {
@@ -466,25 +458,23 @@
                 let score = 0;
                 
                 terms.forEach(term => {
-                    // キーワードの出現回数でスコアリング
-                    const count = (content.match(new RegExp(term, 'g')) || []).length; 
+                    const count = (content.match(new RegExp(term, 'g')) || []).length;
                     score += count;
                 });
                 return { ...doc, score };
             });
             
-            // スコアの高い順にソートし、Top-Kを返す
-            return scores.filter(doc => doc.score > 0).sort((a, b) => b.score - a.score).slice(0, topK);
+            return scores.sort((a, b) => b.score - a.score).slice(0, topK);
         }
 
-        // --- モデル送信ロジック (Ollama/Gemini 切り替え) ---
+        // --- モデル送信ロジック ---
         async function sendToModel() {
             const userInputElement = document.getElementById('userInput');
             const userInput = userInputElement.value.trim();
             const pasteAreaContent = document.getElementById('pasteArea').value.trim();
             const chatLog = document.getElementById('chatLog');
             const sendButton = document.getElementById('sendButton');
-            const modelSelect = document.getElementById('modelSelect').value; // 例: "gpt-oss:20b" または "gemini-1.5-flash"
+            const modelSelect = document.getElementById('modelSelect').value;
 
             if (!userInput) {
                 alert("質問を入力してください。");
@@ -495,7 +485,7 @@
             sendButton.textContent = '送信中...';
             chatLog.innerHTML += `<p><strong>質問:</strong> ${userInput}</p>`;
             const responseParagraph = document.createElement('p');
-            responseParagraph.innerHTML = '<strong>回答:</strong> (応答待機中...)';
+            responseParagraph.innerHTML = '<strong>回答:</strong> ';
             chatLog.appendChild(responseParagraph);
             
             // 永続化された文書 + OCR結果 + 貼り付けテキストの全てをRAG対象とする
@@ -506,7 +496,6 @@
 
             // RAGコンテキストの生成
             const relevantDocs = findRelevantDocs(userInput, allDocuments);
-            // 関連文書をプロンプトに含める (最大5000文字)
             const context = relevantDocs.map(doc => `【${doc.name}】\n${doc.content}`).join('\n\n').slice(0, 5000);
             
             // プロンプトの生成
@@ -520,98 +509,51 @@ ${context}
 
 質問: ${userInput}`;
 
+            // コンテキストサイズの設定: 20B/12B/120Bは8192、それ以外は4096
+            const numCtx = (modelSelect.includes('20b') || modelSelect.includes('12b') || modelSelect.includes('120b')) ? 8192 : 4096;
+
             let result = '';
-            let endpoint = '';
-            let bodyData = {};
-            let isStreaming = false;
-            
-            // --- モデルの振り分けロジック ---
-            const isGeminiCloudModel = GEMINI_MODELS.includes(modelSelect);
-            
-            if (isGeminiCloudModel) {
-                // --- Gemini Cloud Model (FastAPIプロキシ経由) ---
-                endpoint = 'http://localhost:8000/api/gemini_proxy'; 
-                bodyData = {
-                    model: modelSelect, // 例: "gemini-1.5-flash"
-                    prompt: prompt,
-                    temperature: 0.1
-                };
-                isStreaming = false; // FastAPIプロキシ側でストリーミングをOFFにしている前提
-
-            } else {
-                // --- Ollama Local Model ---
-                endpoint = 'http://localhost:11434/api/generate';
-                // コンテキストサイズの設定: 20B/12B/120Bは8192、それ以外は4096 (Ollamaモデルのみに適用)
-                const numCtx = (modelSelect.includes('20b') || modelSelect.includes('12b') || modelSelect.includes('120b')) ? 8192 : 4096;
-                
-                bodyData = {
-                    model: modelSelect, // 例: "gpt-oss:20b"
-                    prompt: prompt,
-                    stream: true,
-                    options: { 
-                        temperature: 0.1, 
-                        num_ctx: numCtx
-                    }
-                };
-                isStreaming = true;
-            }
-
             try {
-                // --- APIリクエストの実行 ---
-                const response = await fetch(endpoint, {
+                const response = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(bodyData)
+                    body: JSON.stringify({
+                        model: modelSelect, 
+                        prompt: prompt,
+                        stream: true,
+                        options: {
+                            temperature: 0.1, 
+                            num_ctx: numCtx
+                        }
+                    })
                 });
 
-                if (!response.ok) {
-                    const errorDetail = await response.text();
-                    // エラーメッセージをより分かりやすく
-                    const errorSource = isGeminiCloudModel ? 'FastAPIプロキシ/Gemini API' : 'Ollamaサーバー';
-                    throw new Error(`${errorSource} エラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} がロードできませんでした。詳細: ${errorDetail.slice(0, 100)}...`);
-                }
+                if (!response.ok) throw new Error(`Ollamaサーバーエラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} がロードできませんでした。`);
 
-                // --- ストリーミング/非ストリーミングの処理分岐 ---
-                if (isStreaming) {
-                    // Ollama (ストリーミング) 処理
-                    if (!response.body) throw new Error("Ollamaサーバーから応答ボディがありません。");
+                if (!response.body) throw new Error("Ollamaサーバーから応答ボディがありません。");
 
-                    const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
                     
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        
-                        const chunk = decoder.decode(value, { stream: true });
-                        chunk.trim().split('\n').forEach(line => {
-                            if (line) {
-                                try {
-                                    const json = JSON.parse(line);
-                                    if (json.response) {
-                                        result += json.response;
-                                        responseParagraph.innerHTML = `<strong>回答:</strong> ${result.replace(/\n/g, '<br>')}`;
-                                    }
-                                } catch (e) {
-                                    // JSON解析エラーは無視（次のチャンクで繋がる可能性があるため）
+                    const chunk = decoder.decode(value, { stream: true });
+                    chunk.trim().split('\n').forEach(line => {
+                        if (line) {
+                            try {
+                                const json = JSON.parse(line);
+                                if (json.response) {
+                                    result += json.response;
+                                    responseParagraph.innerHTML = `<strong>回答:</strong> ${result.replace(/\n/g, '<br>')}`;
                                 }
+                            } catch (e) {
                             }
-                        });
-                    }
-                } else {
-                    // Gemini (非ストリーミング) 処理 (FastAPIプロキシからの単一JSON応答)
-                    const json = await response.json();
-                    if (json.response) {
-                        result = json.response;
-                    } else if (json.detail) {
-                        // FastAPIプロキシからのエラーメッセージをキャッチ
-                        throw new Error(`Geminiプロキシ処理エラー: ${json.detail}`);
-                    } else {
-                        throw new Error("FastAPIプロキシからの予期しない応答形式です。");
-                    }
+                        }
+                    });
                 }
                 
-                // 最終結果の表示
                 responseParagraph.innerHTML = `<strong>回答:</strong> ${result.replace(/\n/g, '<br>')}`;
                 userInputElement.value = '';
 
@@ -629,8 +571,7 @@ ${context}
         document.addEventListener('DOMContentLoaded', () => {
             loadDocuments(); // 起動時に永続化された文書をロード
             document.getElementById('sendButton').addEventListener('click', sendToModel);
-            
-            // saveOcrButtonのイベントリスナーは上部に移動済み
+            document.getElementById('saveOcrButton').addEventListener('click', saveOcrTextAsFile);
             
             document.getElementById('userInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
