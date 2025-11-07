@@ -167,24 +167,6 @@
             border-bottom: 1px dashed #ccc;
             margin-bottom: 5px;
             color: orange; /* 初期色をオレンジに */
-            /* ローディングインジケータ（シンプル版） */
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        /* スピナーアニメーション（オプション） */
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 2s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -280,8 +262,7 @@
                     persistentDocuments = [];
                     ocrDocuments = [];
                     document.getElementById('pasteArea').value = '';
-                    // OCR関連の表示もクリア
-                    clearOcrDisplay();
+                    document.querySelectorAll('#fileContent img, #fileContent .ocr-status').forEach(el => el.remove());
 
                     // UIを更新
                     updateFileListDisplay(); 
@@ -297,7 +278,6 @@
         // OCR/画像関連の表示をクリアするヘルパー関数
         function clearOcrDisplay() {
             // 既存のOCR関連要素をクリア
-            // 画像とステータスを両方削除します
             document.querySelectorAll('#fileContent img, #fileContent .ocr-status').forEach(el => el.remove());
         }
 
@@ -331,12 +311,12 @@
                     initialContent += `<p><strong>【${doc.name}】</strong></p><pre>--- ファイル名: ${doc.name} ---\n${doc.content.slice(0, 300)}${doc.content.length > 300 ? '...' : ''}</pre>\n`;
                 });
             } else {
-                initialContent += '<p>現在RAGのソースとなる文書はありません。</p>';
+                 initialContent += '<p>現在RAGのソースとなる文書はありません。</p>';
             }
             fileContentDiv.innerHTML = initialContent;
             
             // OCRで残っている画像やステータスがあれば再挿入（これは初期表示時のみの特殊な対応）
-            // clearOcrDisplay() でクリアされるため、通常は空になるはずですが、念のため
+            // 通常、ファイルが選択されたら clearOcrDisplay() でクリアされる
             const existingOcrContent = document.querySelectorAll('#fileContent img, #fileContent .ocr-status');
             existingOcrContent.forEach(el => fileContentDiv.prepend(el));
         }
@@ -351,55 +331,30 @@
             }
         }
 
-        // --- Tesseract.js OCR処理関数 (改善版: 詳細ステータス表示付き) ---
+        // --- Tesseract.js OCR処理関数 (改善版) ---
         async function runOcrOnImage(base64Image, statusElement) {
             try {
                 if (!worker) {
-                    statusElement.innerHTML = '<div class="spinner"></div> OCRワーカーを初期化中... (1/3 初回時間がかかります)';
-                    statusElement.style.color = 'orange';
-
-                    // Tesseract Workerの作成 (ロガーを設定)
+                    statusElement.textContent = 'OCRワーカーを初期化中... (初回のみ時間がかかります)';
                     worker = await Tesseract.createWorker({
                         logger: m => {
-                            const progress = Math.round(m.progress * 100);
-                            let statusText = '';
-                            
-                            // 処理の進捗に合わせて詳細なメッセージを表示
-                            if (m.status === 'downloading tesseract core') {
-                                statusText = `OCRエンジンをダウンロード中... (${progress}%)`;
-                            } else if (m.status === 'loading tesseract core') {
-                                statusText = `OCRエンジンをロード中... (${progress}%)`;
-                            } else if (m.status === 'initializing api') {
-                                statusText = `APIを初期化中... (${progress}%)`;
-                            } else if (m.status === 'loading language traineddata') {
-                                 statusText = `言語データ(jpn+eng)をロード中... (${progress}%)`;
-                            } else if (m.status === 'initializing api') {
-                                 statusText = `OCR APIを初期化中... (${progress}%)`;
-                            } else if (m.status === 'recognizing text' && m.progress > 0) {
-                                 // テキスト認識中の進捗
-                                 statusText = `テキスト認識中: ${progress}%`;
-                                 statusElement.style.color = 'blue'; 
+                            // ログをフィルタリングしてステータス表示を更新
+                            if (m.status === 'recognizing text' && m.progress) {
+                                statusElement.textContent = `OCR処理中: ${Math.round(m.progress * 100)}%`;
+                                statusElement.style.color = 'orange';
                             } else if (m.status) {
-                                 statusText = `OCRステータス: ${m.status}`;
-                            } else {
-                                return; // 不要なログはスキップ
+                                statusElement.textContent = `OCRステータス: ${m.status}`;
                             }
-                            
-                            statusElement.innerHTML = `<div class="spinner"></div> ${statusText}`;
                         },
                     });
-                    
-                    // 言語ロードと初期化フェーズ
-                    statusElement.innerHTML = '<div class="spinner"></div> 言語データをロード中 (jpn+eng)... (2/3)';
+                    // 日本語と英語の言語ファイルをロード
+                    statusElement.textContent = '言語データをロード中 (jpn+eng)...';
                     await worker.loadLanguage('jpn+eng'); 
-                    
-                    statusElement.innerHTML = '<div class="spinner"></div> OCRワーカーを初期化中... (3/3)';
+                    statusElement.textContent = 'OCRワーカーを初期化中...';
                     await worker.initialize('jpn+eng');
-                    
                     statusElement.textContent = 'OCRワーカーの初期化完了。テキスト認識中...';
                 }
 
-                // 認識フェーズ
                 const { data: { text } } = await worker.recognize(base64Image);
                 return text;
             } catch (error) {
@@ -411,7 +366,6 @@
 
         // --- ファイル入力のイベントリスナー ---
         document.getElementById('fileInput').addEventListener('change', function () {
-            // ... (変更なし) ...
             const files = this.files;
             if (files.length === 0) return;
             
@@ -462,14 +416,14 @@
                     
                     // OCR結果は一旦クリア
                     ocrDocuments = [];
+                    // 既存のOCR関連要素をクリア
                     clearOcrDisplay();
 
-                    // 処理中メッセージ表示要素 (ステータス表示用)
+                    // 処理中メッセージ表示要素
                     const processingMessage = document.createElement('p');
                     processingMessage.className = 'ocr-status';
                     processingMessage.textContent = '画像を貼り付けました。OCR処理を開始しています...';
-                    const fileContentDiv = document.getElementById('fileContent');
-                    fileContentDiv.prepend(processingMessage);
+                    document.getElementById('fileContent').prepend(processingMessage);
 
                     reader.onload = async function (event) {
                         const base64Image = event.target.result;
@@ -479,10 +433,10 @@
                         const img = document.createElement('img');
                         img.src = base64Image;
                         img.alt = imageName;
-                        fileContentDiv.prepend(img);
+                        document.getElementById('fileContent').prepend(img);
                         
                         try {
-                            // 1. OCR処理を実行 (詳細ステータスはprocessingMessageで更新される)
+                            // 1. OCR処理を実行
                             const ocrText = await runOcrOnImage(base64Image, processingMessage);
                             
                             // 2. OCR結果を一時文書として保持
@@ -494,17 +448,17 @@
                                 });
                             }
                             
-                            // 3. ステータス更新（最終メッセージ）
+                            // 3. ステータス更新
                             if (fullOcrContent) {
-                                processingMessage.innerHTML = `✅ OCR処理完了: <strong>${imageName}</strong> のテキストがRAG対象に追加されました (一時保存)。<br>「保存」ボタンで永続化できます。`;
+                                processingMessage.textContent = `✅ OCR処理完了: ${imageName} のテキストがRAG対象に追加されました (一時保存)。`;
                                 processingMessage.style.color = 'green';
                             } else {
-                                processingMessage.innerHTML = `⚠️ OCR処理完了: テキストを検出できませんでした。画像を削除するには「貼付けテキストを永続ファイルとして保存」するか、別の画像を貼り付けてください。`;
+                                processingMessage.textContent = `⚠️ OCR処理完了: テキストを検出できませんでした。`;
                                 processingMessage.style.color = 'brown';
                             }
                             
                         } catch (error) {
-                            processingMessage.innerHTML = `❌ OCR処理中にエラーが発生しました: ${error.message}`;
+                            processingMessage.textContent = `❌ OCR処理中にエラーが発生しました: ${error.message}`;
                             processingMessage.style.color = 'red';
                             console.error("OCR Error:", error);
                         } finally {
@@ -552,6 +506,7 @@
             
             persistentDocuments.push({ name: filename, content: contentToSave });
             saveDocuments();
+            updateFileListDisplay();
             
             // 4. ローカルPCにダウンロード (エクスプローラへの保存)
             const blob = new Blob([contentToSave], { type: 'text/plain;charset=utf-8' });
@@ -567,14 +522,12 @@
             
             document.getElementById('pasteArea').value = '';
             ocrDocuments = [];
-            clearOcrDisplay(); // 重要な変更点：保存が完了したら画像とステータスをクリア
-            updateFileListDisplay(); // ファイルリストを更新
+            clearOcrDisplay();
         }
 
 
         // --- 関連文書検索ロジック (キーワードマッチング) ---
         function findRelevantDocs(query, docs, topK = 3) {
-            // ... (変更なし) ...
             if (!docs || docs.length === 0) return [];
             
             // 💡 RAG検索ロジックを改善: 助詞や句読点を除去した単語リストで検索
@@ -604,7 +557,6 @@
 
         // --- モデル送信ロジック (Ollama/Gemini 切り替え) ---
         async function sendToModel() {
-            // ... (変更なし) ...
             const userInputElement = document.getElementById('userInput');
             const userInput = userInputElement.value.trim();
             const pasteAreaContent = document.getElementById('pasteArea').value.trim();
