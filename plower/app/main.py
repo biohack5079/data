@@ -17,7 +17,13 @@ if not GEMINI_API_KEY:
     print("FATAL: GEMINI_API_KEY is not set in the .env file.") 
 
 # Geminiクライアントの初期化
-client = genai.Client(api_key=GEMINI_API_KEY)
+# キーがない場合、この初期化処理でエラーになる可能性があるため、キーチェックを強化
+if GEMINI_API_KEY:
+    client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    # APIキーがない場合はダミーを設定 (後続のチェックでエラーを発生させる)
+    client = None
+    
 app = FastAPI()
 
 # ⚠️ CORS設定: フロントエンドのポートと合わせてください
@@ -25,8 +31,9 @@ app = FastAPI()
 origins = [
     "http://127.0.0.1",
     "http://localhost",
-    "http://localhost:8000", # FastAPIのポート
-    "http://localhost:5500", # Live ServerなどのHTML実行環境のポート
+    "http://localhost:8000",  # HTML簡易サーバーのポート
+    "http://localhost:8001",  # FastAPIサーバーのポート
+    "http://localhost:5500",  # Live ServerなどのHTML実行環境のポート
 ]
 
 app.add_middleware(
@@ -54,16 +61,29 @@ async def gemini_proxy(request_data: GeminiRequest):
     """
     フロントエンドからのプロンプトを受け取り、Gemini APIに安全にリクエストを送信する。
     """
-    if not GEMINI_API_KEY:
+    if not client:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Server API Key is not configured."
+            detail="Server API Client is not configured. (Missing GEMINI_API_KEY)"
         )
 
+    # 🚀 モデル名マッピング処理 (404 NOT FOUNDエラー対策)
+    # フロントエンドで選択されたモデル名を使用可能な最新/互換モデル名に置き換える
+    model_name = request_data.model
+    if "1.5-flash" in model_name or model_name == "gemini-flash":
+        # 1.5-flash / gemini-flash が指定された場合、現行の 2.5-flash にマッピング
+        actual_model = "gemini-2.5-flash"
+    elif "1.5-pro" in model_name or model_name == "gemini-pro":
+        # 1.5-pro / gemini-pro が指定された場合、現行の 2.5-pro にマッピング
+        actual_model = "gemini-2.5-pro"
+    else:
+        # その他のモデル名 (ollamaなど) が指定された場合はそのまま使用（エラーになる可能性あり）
+        actual_model = model_name
+
     try:
-        # Gemini APIの呼び出し
+        # Gemini APIの呼び出し (修正したモデル名を使用)
         response = client.models.generate_content(
-            model=request_data.model,
+            model=actual_model,
             contents=request_data.prompt,
             config=genai.types.GenerateContentConfig(
                 temperature=request_data.temperature
@@ -74,13 +94,11 @@ async def gemini_proxy(request_data: GeminiRequest):
         
     except Exception as e:
         error_detail = str(e)
-        # より詳細なエラーをロギングし、クライアントには汎用的なエラーを返す
+        # 404 NOT_FOUNDなど具体的なエラーをサーバーログに出力
         print(f"Gemini API Call Error: {error_detail}") 
+        
+        # クライアントには汎用的なエラーを返す
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during AI generation. Please check the server logs."
         )
-
-# バックエンド実行コマンド (plowerフォルダ内)
-# $ cd app
-# $ uvicorn main:app --reload --port 8000

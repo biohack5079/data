@@ -71,13 +71,13 @@
         
         /* 貼り付けエリア */
         #pasteArea {
-            height: 200px;
+            height: 50px;
         }
         
         /* 入力系 */
         textarea {
             width: 100%;
-            height: 50px;
+            height: 100px;
             margin-top: 5px;
             padding: 8px;
             box-sizing: border-box;
@@ -116,6 +116,8 @@
             background-color: #dc3545; /* 赤色 */
             padding: 8px 15px;
             margin-left: 10px;
+            /* 他のボタンの直後に追加する場合は、margin-topを合わせるか調整してください */
+            /* 今回は fileInput の直後に配置するため、margin-top: 5px; が適切かもしれません */
             margin-top: 5px; 
         }
 
@@ -194,7 +196,8 @@
 <select id="modelSelect">
     <option value="gemma:7b">Gemma 7B (Ollama)</option>
     <option value="gpt-oss:20b" selected>GPT-OSS 20B (Ollama)</option>
-    <option value="gemma:12b">Gemma 12B (Ollama)</option> <option value="gpt-oss:120b">GPT-OSS 120B (Ollama)</option>
+    <option value="gemma3:12b">Gemma 12B (Ollama)</option>
+    <option value="gpt-oss:120b">GPT-OSS 120B (Ollama)</option>
 
     <option value="gemini-1.5-flash">Gemini 1.5 Flash (クラウド)</option>
     <option value="gemini-1.5-pro">Gemini 1.5 Pro (クラウド)</option>
@@ -492,28 +495,18 @@
         function findRelevantDocs(query, docs, topK = 3) {
             if (!docs || docs.length === 0) return [];
             
-            // 💡 RAG検索ロジックを改善: 助詞や句読点を除去した単語リストで検索
-            const contentCleanedQuery = query.toLowerCase()
-                .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()？。、はがをにでと]/g, " ") // 日本語の助詞・句読点も除去
-                .split(/\s+/)
-                .filter(t => t.length > 1); // 1文字以下の単語は無視
-
-            const searchTerms = Array.from(new Set([query.toLowerCase(), ...contentCleanedQuery])); // 元のクエリと単語リストを統合
-
             const scores = docs.map(doc => {
                 const content = (doc.content || '').toLowerCase();
+                const terms = query.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").split(/\s+/).filter(t => t.length > 0);
                 let score = 0;
                 
-                searchTerms.forEach(term => {
-                    // 全体一致と部分一致の両方でスコアを計算
+                terms.forEach(term => {
                     const count = (content.match(new RegExp(term, 'g')) || []).length; 
-                    // キーワードの文字数で重み付け (長いキーワードほど重要)
-                    score += count * term.length; 
+                    score += count;
                 });
                 return { ...doc, score };
             });
             
-            // スコアが0より大きい文書をソートして返す
             return scores.filter(doc => doc.score > 0).sort((a, b) => b.score - a.score).slice(0, topK);
         }
 
@@ -569,7 +562,7 @@ ${context}
             
             if (isGeminiCloudModel) {
                 // --- Gemini Cloud Model (FastAPIプロキシ経由) ---
-                endpoint = 'http://localhost:8001/api/gemini_proxy'; 
+                endpoint = 'http://localhost:8000/api/gemini_proxy'; 
                 bodyData = {
                     model: modelSelect, 
                     prompt: prompt,
@@ -606,8 +599,7 @@ ${context}
                 if (!response.ok) {
                     const errorDetail = await response.text();
                     const errorSource = isGeminiCloudModel ? 'FastAPIプロキシ/Gemini API' : 'Ollamaサーバー';
-                    // 💡 エラーメッセージを修正: modelSelectはすでにプレフィックスなしの値なので、そのまま表示
-                    throw new Error(`${errorSource} エラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} のロードまたは通信に失敗しました。詳細: ${errorDetail.slice(0, 100)}...`);
+                    throw new Error(`${errorSource} エラー: ${response.status} ${response.statusText}. モデル: ${modelSelect}. 詳細: ${errorDetail.slice(0, 100)}...`);
                 }
 
                 // --- ストリーミング/非ストリーミングの処理分岐 ---

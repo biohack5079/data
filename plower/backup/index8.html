@@ -71,13 +71,13 @@
         
         /* 貼り付けエリア */
         #pasteArea {
-            height: 200px;
+            height: 50px;
         }
         
         /* 入力系 */
         textarea {
             width: 100%;
-            height: 50px;
+            height: 100px;
             margin-top: 5px;
             padding: 8px;
             box-sizing: border-box;
@@ -110,15 +110,6 @@
         #saveOcrButton {
               background-color: #007BFF;
         }
-        
-        /* リセットボタンのスタイル */
-        #resetDocsButton {
-            background-color: #dc3545; /* 赤色 */
-            padding: 8px 15px;
-            margin-left: 10px;
-            margin-top: 5px; 
-        }
-
 
         button:disabled {
             background-color: #aaa;
@@ -168,8 +159,6 @@
     <label for="fileInput">RAGソース文書 (Textファイル):</label>
     <input type="file" id="fileInput" accept=".txt" multiple>
     
-    <button id="resetDocsButton">RAGソースをリセット (LocalStorage全削除)</button>
-
     <div class="rag-source-container">
         <div id="fileList">
             <h3>RAGソースファイル一覧 (永続化/アップロード)</h3>
@@ -194,7 +183,8 @@
 <select id="modelSelect">
     <option value="gemma:7b">Gemma 7B (Ollama)</option>
     <option value="gpt-oss:20b" selected>GPT-OSS 20B (Ollama)</option>
-    <option value="gemma:12b">Gemma 12B (Ollama)</option> <option value="gpt-oss:120b">GPT-OSS 120B (Ollama)</option>
+    <option value="gemma3:12b">Gemma 12B (Ollama)</option>
+    <option value="gpt-oss:120b">GPT-OSS 120B (Ollama)</option>
 
     <option value="gemini-1.5-flash">Gemini 1.5 Flash (クラウド)</option>
     <option value="gemini-1.5-pro">Gemini 1.5 Pro (クラウド)</option>
@@ -215,7 +205,7 @@
         
         const PREVIEW_MAX_DOCS = 5; // コンテンツ表示エリアに表示する最大ファイル数
 
-        // 💡 クラウド（Gemini API）モデルのリストを定義 (モデル判別に利用)
+        // クラウド（Gemini API）モデルのリストを定義 (モデル判別に利用)
         const GEMINI_MODELS = [
             "gemini-1.5-flash",
             "gemini-1.5-pro",
@@ -241,31 +231,6 @@
                 console.error("Failed to save documents to LocalStorage:", e);
             }
         }
-        
-        // 💡 LocalStorageをリセットする関数
-        function resetDocuments() {
-            if (confirm("本当にRAGソース文書を全て削除しますか？\n（この操作は元に戻せません。アップロードされたファイルがLocalStorageから全て消去されます。）")) {
-                try {
-                    // LocalStorageからキーを削除
-                    localStorage.removeItem('plowerRAGDocs');
-                    
-                    // アプリケーション内のデータをクリア
-                    persistentDocuments = [];
-                    ocrDocuments = [];
-                    document.getElementById('pasteArea').value = '';
-                    document.querySelectorAll('#fileContent img, #fileContent .ocr-status').forEach(el => el.remove());
-
-                    // UIを更新
-                    updateFileListDisplay(); 
-                    
-                    alert("RAGソース文書を全てリセットしました。");
-                } catch (e) {
-                    console.error("Failed to reset documents:", e);
-                    alert("リセット中にエラーが発生しました。");
-                }
-            }
-        }
-
 
         // --- ファイル一覧表示の更新とクリックイベント設定 ---
         function updateFileListDisplay() {
@@ -327,6 +292,7 @@
                         }
                     },
                 });
+                // 言語設定は tesseract.js のダウンロード状況によるが、今回は汎用的な jpn+eng を使用
                 await worker.loadLanguage('jpn+eng'); 
                 await worker.initialize('jpn+eng');
                 statusElement.textContent = 'OCRワーカーの初期化完了。テキスト認識中...';
@@ -338,7 +304,7 @@
         }
 
 
-        // --- ファイル入力のイベントリスナー ---
+        // --- ファイル入力のイベントリスナー (既存ファイルおよび保存ファイルの再読み込み) ---
         document.getElementById('fileInput').addEventListener('change', function () {
             const files = this.files;
             
@@ -347,6 +313,7 @@
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = function (e) {
+                        // ファイル名が重複しないようにチェック（今回は簡易的にタイムスタンプを付加）
                         const docName = file.name;
                         const newDoc = { name: docName, content: e.target.result };
                         persistentDocuments.push(newDoc);
@@ -438,7 +405,7 @@
             // 画像貼り付けではない場合はテキスト貼り付けなので処理をしない
         });
         
-        // --- OCR/貼付テキストのファイル保存と永続化 ---
+        // --- 独自追加機能: OCR/貼付テキストのファイル保存と永続化 ---
         document.getElementById('saveOcrButton').addEventListener('click', saveOcrTextAsFile);
 
         function saveOcrTextAsFile() {
@@ -456,6 +423,7 @@
 
             // 1. LocalStorageに永続化 (ファイル名を付けて persistentDocuments に追加)
             const now = new Date();
+            // ファイル名生成 (例: plower_memo_20251107_85516.txt)
             const pad = (num) => num.toString().padStart(2, '0');
             const filename = `plower_memo_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.txt`;
             
@@ -492,28 +460,20 @@
         function findRelevantDocs(query, docs, topK = 3) {
             if (!docs || docs.length === 0) return [];
             
-            // 💡 RAG検索ロジックを改善: 助詞や句読点を除去した単語リストで検索
-            const contentCleanedQuery = query.toLowerCase()
-                .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()？。、はがをにでと]/g, " ") // 日本語の助詞・句読点も除去
-                .split(/\s+/)
-                .filter(t => t.length > 1); // 1文字以下の単語は無視
-
-            const searchTerms = Array.from(new Set([query.toLowerCase(), ...contentCleanedQuery])); // 元のクエリと単語リストを統合
-
             const scores = docs.map(doc => {
                 const content = (doc.content || '').toLowerCase();
+                const terms = query.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"").split(/\s+/).filter(t => t.length > 0);
                 let score = 0;
                 
-                searchTerms.forEach(term => {
-                    // 全体一致と部分一致の両方でスコアを計算
+                terms.forEach(term => {
+                    // キーワードの出現回数でスコアリング
                     const count = (content.match(new RegExp(term, 'g')) || []).length; 
-                    // キーワードの文字数で重み付け (長いキーワードほど重要)
-                    score += count * term.length; 
+                    score += count;
                 });
                 return { ...doc, score };
             });
             
-            // スコアが0より大きい文書をソートして返す
+            // スコアの高い順にソートし、Top-Kを返す
             return scores.filter(doc => doc.score > 0).sort((a, b) => b.score - a.score).slice(0, topK);
         }
 
@@ -524,7 +484,7 @@
             const pasteAreaContent = document.getElementById('pasteArea').value.trim();
             const chatLog = document.getElementById('chatLog');
             const sendButton = document.getElementById('sendButton');
-            const modelSelect = document.getElementById('modelSelect').value; 
+            const modelSelect = document.getElementById('modelSelect').value; // 例: "gpt-oss:20b" または "gemini-1.5-flash"
 
             if (!userInput) {
                 alert("質問を入力してください。");
@@ -538,7 +498,7 @@
             responseParagraph.innerHTML = '<strong>回答:</strong> (応答待機中...)';
             chatLog.appendChild(responseParagraph);
             
-            // 全てのRAGソースを統合
+            // 永続化された文書 + OCR結果 + 貼り付けテキストの全てをRAG対象とする
             let allDocuments = [...persistentDocuments, ...ocrDocuments];
             if (pasteAreaContent) {
                 allDocuments.push({ name: '貼付けテキスト(一時)', content: pasteAreaContent });
@@ -546,6 +506,7 @@
 
             // RAGコンテキストの生成
             const relevantDocs = findRelevantDocs(userInput, allDocuments);
+            // 関連文書をプロンプトに含める (最大5000文字)
             const context = relevantDocs.map(doc => `【${doc.name}】\n${doc.content}`).join('\n\n').slice(0, 5000);
             
             // プロンプトの生成
@@ -564,27 +525,27 @@ ${context}
             let bodyData = {};
             let isStreaming = false;
             
-            // --- 💡 モデルの振り分けロジック ---
+            // --- モデルの振り分けロジック ---
             const isGeminiCloudModel = GEMINI_MODELS.includes(modelSelect);
             
             if (isGeminiCloudModel) {
                 // --- Gemini Cloud Model (FastAPIプロキシ経由) ---
-                endpoint = 'http://localhost:8001/api/gemini_proxy'; 
+                endpoint = 'http://localhost:8000/api/gemini_proxy'; 
                 bodyData = {
-                    model: modelSelect, 
+                    model: modelSelect, // 例: "gemini-1.5-flash"
                     prompt: prompt,
                     temperature: 0.1
                 };
-                isStreaming = false; 
+                isStreaming = false; // FastAPIプロキシ側でストリーミングをOFFにしている前提
 
             } else {
                 // --- Ollama Local Model ---
                 endpoint = 'http://localhost:11434/api/generate';
-                // コンテキストサイズ設定 (Ollamaモデルのみ)
+                // コンテキストサイズの設定: 20B/12B/120Bは8192、それ以外は4096 (Ollamaモデルのみに適用)
                 const numCtx = (modelSelect.includes('20b') || modelSelect.includes('12b') || modelSelect.includes('120b')) ? 8192 : 4096;
                 
                 bodyData = {
-                    model: modelSelect, 
+                    model: modelSelect, // 例: "gpt-oss:20b"
                     prompt: prompt,
                     stream: true,
                     options: { 
@@ -605,9 +566,9 @@ ${context}
 
                 if (!response.ok) {
                     const errorDetail = await response.text();
+                    // エラーメッセージをより分かりやすく
                     const errorSource = isGeminiCloudModel ? 'FastAPIプロキシ/Gemini API' : 'Ollamaサーバー';
-                    // 💡 エラーメッセージを修正: modelSelectはすでにプレフィックスなしの値なので、そのまま表示
-                    throw new Error(`${errorSource} エラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} のロードまたは通信に失敗しました。詳細: ${errorDetail.slice(0, 100)}...`);
+                    throw new Error(`${errorSource} エラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} がロードできませんでした。詳細: ${errorDetail.slice(0, 100)}...`);
                 }
 
                 // --- ストリーミング/非ストリーミングの処理分岐 ---
@@ -632,7 +593,7 @@ ${context}
                                         responseParagraph.innerHTML = `<strong>回答:</strong> ${result.replace(/\n/g, '<br>')}`;
                                     }
                                 } catch (e) {
-                                    // JSON解析エラーは無視
+                                    // JSON解析エラーは無視（次のチャンクで繋がる可能性があるため）
                                 }
                             }
                         });
@@ -643,6 +604,7 @@ ${context}
                     if (json.response) {
                         result = json.response;
                     } else if (json.detail) {
+                        // FastAPIプロキシからのエラーメッセージをキャッチ
                         throw new Error(`Geminiプロキシ処理エラー: ${json.detail}`);
                     } else {
                         throw new Error("FastAPIプロキシからの予期しない応答形式です。");
@@ -665,10 +627,10 @@ ${context}
         
         // --- 初期化とイベントリスナー設定 ---
         document.addEventListener('DOMContentLoaded', () => {
-            loadDocuments(); 
+            loadDocuments(); // 起動時に永続化された文書をロード
             document.getElementById('sendButton').addEventListener('click', sendToModel);
-            // 💡 リセットボタンのイベントリスナー
-            document.getElementById('resetDocsButton').addEventListener('click', resetDocuments);
+            
+            // saveOcrButtonのイベントリスナーは上部に移動済み
             
             document.getElementById('userInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
