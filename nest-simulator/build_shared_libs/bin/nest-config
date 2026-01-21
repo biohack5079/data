@@ -1,0 +1,109 @@
+#! /bin/sh
+
+prefix="/home/s24156/data/.venv"
+exec_prefix=${prefix}
+
+usage()
+{
+    cat <<EOF
+Usage: nest-config [OPTION]
+
+Known values for OPTION are:
+
+  --prefix              NEST install prefix for architecture-independent files
+  --exec-prefix         NEST install prefix for architecture-dependent files
+  --libs                print library linking information for extension modules
+  --cflags              print pre-processor and compiler flags
+  --includes            print includes
+  --compiler            print the compiler used to compile NEST
+  --compiler-name       Print the compiler name used to compile NEST
+  --compiler-version    Print the compiler version used to compile NEST
+  --python-executable   print full path to Python interpreter used
+  --python-version      print Python version string for interpreter
+  --static-libraries    print "ON" if configured for static libraries, "OFF" otherwise
+  --docdir              print the relative path (to prefix) to the installed documentation
+  --datadir             print the relative path (to prefix) to the installed data
+  --libdir              print the relative path (to prefix) to the installed libraries
+  --help                display this help and exit
+  --version             output version information
+
+EOF
+
+    exit "${1}"
+}
+
+if test $# -eq 0; then
+    usage 1
+fi
+
+while test $# -gt 0; do
+    case "$1" in
+    -*=*)
+        optarg="$(echo "$1" | sed 's/[-_a-zA-Z0-9]*=//')"
+        ;;
+    *)
+        optarg=
+        ;;
+    esac
+
+    case "$1" in
+    --prefix=*)
+        prefix="${optarg}"
+        ;;
+    --prefix)
+        echo "${prefix}"
+        ;;
+    --exec-prefix)
+        echo "${exec_prefix}"
+        ;;
+    --version)
+        echo "3.9.0-post0.dev0"
+        ;;
+    --help)
+        usage 0
+        ;;
+    --includes)
+        echo " -I/home/s24156/data/.venv/include/nest -I/usr/include -I/usr/include -I/usr/include "
+        ;;
+    --cflags)
+        echo " -std=c++17 -Wall -fopenmp -O2 -fdiagnostics-color=auto"
+        ;;
+    --libs)
+        echo "-L${prefix}/lib/nest -lnest -lsli /usr/lib/x86_64-linux-gnu/libltdl.so /usr/lib/x86_64-linux-gnu/libreadline.so /usr/lib/x86_64-linux-gnu/libncurses.so /usr/lib/x86_64-linux-gnu/libgsl.so /usr/lib/x86_64-linux-gnu/libgslcblas.so    /usr/lib/gcc/x86_64-linux-gnu/13/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.a  "
+        ;;
+    --compiler)
+        echo "/usr/bin/c++"
+        ;;
+    --compiler-name)
+        echo "GNU"
+        ;;
+    --compiler-version)
+        echo "13.3.0"
+        ;;
+    --python-executable)
+        echo "/home/s24156/data/.venv/bin/python3"
+        ;;
+    --python-version)
+        echo "3.13.9"
+        ;;
+
+    --static-libraries)
+        echo "OFF"
+        ;;
+    --docdir)
+        echo "share/doc/nest"
+        ;;
+    --datadir)
+        echo "share/nest"
+        ;;
+    --libdir)
+        echo "lib"
+        ;;
+    *)
+        usage 1
+        ;;
+    esac
+    shift
+done
+
+exit 0
