@@ -1,5 +1,6 @@
-python -m http.server 8000
 uvicorn app.main:app --reload --port 8001
+python -m http.server 8000
+
 
 
 モデルが無い場合

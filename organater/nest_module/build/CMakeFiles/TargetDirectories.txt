@@ -1,3 +1,7 @@
 /home/s24156/data/organater/nest_module/build/CMakeFiles/nest_module.dir
 /home/s24156/data/organater/nest_module/build/CMakeFiles/edit_cache.dir
 /home/s24156/data/organater/nest_module/build/CMakeFiles/rebuild_cache.dir
+/home/s24156/data/organater/nest_module/build/CMakeFiles/list_install_components.dir
+/home/s24156/data/organater/nest_module/build/CMakeFiles/install.dir
+/home/s24156/data/organater/nest_module/build/CMakeFiles/install/local.dir
+/home/s24156/data/organater/nest_module/build/CMakeFiles/install/strip.dir

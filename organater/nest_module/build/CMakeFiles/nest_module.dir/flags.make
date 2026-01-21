@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -Dnest_module_EXPORTS
 
-CXX_INCLUDES = -isystem /home/s24156/data/.venv/include/nest -isystem /home/s24156/data/nest-simulator -isystem /home/s24156/data/nest-simulator/lib -isystem /home/s24156/data/nest-simulator/models -isystem /home/s24156/data/nest-simulator/nestkernel -isystem /home/s24156/data/organater/nest_module -isystem /home/s24156/data/organater/nest_module/models
+CXX_INCLUDES = -isystem /home/s24156/data/.venv/include -isystem /home/s24156/data/nest-simulator -isystem /home/s24156/data/organater/nest_module/  -isystem /home/s24156/data/nest-simulator/lib -isystem /home/s24156/data/nest-simulator/models -isystem /home/s24156/data/nest-simulator/nestkernel -isystem /home/s24156/data/nest-simulator/libnestutil -isystem /home/s24156/data/nest-simulator/build_shared_libs/libnestutil -isystem /home/s24156/data/nest-simulator/sli -isystem /home/s24156/data/nest-simulator/thirdparty -isystem /home/s24156/data/organater/nest_module -isystem /home/s24156/data/organater/nest_module/models
 
 CXX_FLAGS = -fPIC
 

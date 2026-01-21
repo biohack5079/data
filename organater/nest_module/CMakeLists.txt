@@ -1,5 +1,3 @@
-# organater/nest_module/CMakeLists.txt (最終ビルド成功を目指す版 V8)
-
 cmake_minimum_required(VERSION 3.5)
 project(nest_module CXX)
 
@@ -17,19 +15,27 @@ set(MODULE_ROOT_DIR "/home/s24156/data/organater/nest_module")
 # -------------------------------------------------------------
 
 # ヘッダーファイルパスを設定
+# 💡 V13: インクルードパスの完全網羅版
 include_directories(
-  SYSTEM
-  ${NEST_INSTALL_PREFIX}/include/nest  # 1. インストールされたNESTのヘッダー
-  
-  # 💡 NESTのソースヘッダーへの最終調整パス (V8: 全てを含める)
-  ${NEST_SOURCE_DIR}                   # 2. ソースルート (lib/ や models/ の親)
-  ${NEST_SOURCE_DIR}/lib               # 3. <lib/...> を解決するため
-  ${NEST_SOURCE_DIR}/models            # 4. ⬅️ <models/...> を解決するため
-  ${NEST_SOURCE_DIR}/nestkernel        # 5. nestkernel内のコアヘッダーを網羅
-  
-  # 💡 カスタムモジュールのヘッダーへのパス
-  ${MODULE_ROOT_DIR}                   # module.h があるパス
-  ${MODULE_ROOT_DIR}/models            # local_learning_synapse.h があるパス
+    SYSTEM
+    ${NEST_INSTALL_PREFIX}/include
+    ${NEST_SOURCE_DIR}                  
+    ${NEST_SOURCE_DIR}/lib               
+    ${NEST_SOURCE_DIR}/models            
+    ${NEST_SOURCE_DIR}/nestkernel        
+    ${NEST_SOURCE_DIR}/libnestutil                    
+    
+    # config.h のパス
+    ${NEST_SOURCE_DIR}/build_shared_libs/libnestutil                    
+    
+    # name.h のパス
+    ${NEST_SOURCE_DIR}/sli                             
+    
+    # 🚨 V13 最終修正: compose.hpp が存在するディレクトリを追加
+    ${NEST_SOURCE_DIR}/thirdparty                      
+    
+    ${MODULE_ROOT_DIR}                   
+    ${MODULE_ROOT_DIR}/models            
 )
 
 # 💡 共有モジュールライブラリの定義
@@ -48,10 +54,15 @@ target_link_libraries(nest_module PUBLIC
 # C++規格を指定
 target_compile_features(nest_module PUBLIC cxx_std_17)
 
-# 共有ライブラリのrpathを設定
+# 共有ライブラリのrpathを設定 (実行時にライブラリが見つかるように)
 set_target_properties(nest_module PROPERTIES
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH "${NEST_INSTALL_PREFIX}/lib/nest"
     INSTALL_RPATH_USE_ORIGIN TRUE
     SKIP_INSTALL_RPATH FALSE
+)
+
+# インストールターゲットの定義
+install(TARGETS nest_module
+        DESTINATION "${NEST_INSTALL_PREFIX}/lib/nest"
 )

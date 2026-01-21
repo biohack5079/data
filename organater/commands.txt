@@ -8,7 +8,7 @@ cd python_scripts/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/nest_module/build
 
 # 2. Pythonスクリプトの実行
-python python_scripts/simulation.py
+python simulation.py
 
 
 
