@@ -534,6 +534,7 @@ ${context}
 
 // --- 初期化とイベントリスナー設定 ---
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("Plower Script Loaded: Cloud API Version (Direct Access)");
     loadDocuments(); 
     document.getElementById('sendButton').addEventListener('click', sendToModel);
     document.getElementById('resetDocsButton').addEventListener('click', resetDocuments);
