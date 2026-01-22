@@ -373,7 +373,7 @@ async function sendToModel() {
     const pasteAreaContent = document.getElementById('pasteArea').value.trim();
     const chatLog = document.getElementById('chatLog');
     const sendButton = document.getElementById('sendButton');
-    const modelSelect = document.getElementById('modelSelect').value; 
+    const modelSelect = document.getElementById('modelSelect').value.trim(); 
 
     if (!userInput) {
         alert("質問を入力してください。");
@@ -422,13 +422,14 @@ ${context}
         // Web版として動作させるため、APIキーをブラウザに入力・保存させる
         let apiKey = localStorage.getItem('plower_gemini_api_key');
         if (!apiKey) {
-            apiKey = window.prompt("Gemini APIキーを入力してください（ブラウザに保存されます）:\n※Google AI Studioで取得可能です");
-            if (!apiKey) {
+            const inputKey = window.prompt("Gemini APIキーを入力してください（ブラウザに保存されます）:\n※Google AI Studioで取得可能です");
+            if (!inputKey) {
                 alert("APIキーが入力されなかったため、送信を中止しました。");
                 sendButton.disabled = false;
                 sendButton.textContent = '送信';
                 return;
             }
+            apiKey = inputKey.trim(); // 余計な空白を除去
             localStorage.setItem('plower_gemini_api_key', apiKey);
         }
 
@@ -468,6 +469,13 @@ ${context}
         if (!response.ok) {
             const errorDetail = await response.text();
             const errorSource = isGeminiCloudModel ? 'Gemini API' : 'Ollamaサーバー';
+            
+            // Gemini APIでエラーが出た場合、APIキーが無効な可能性があるためリセットする
+            if (isGeminiCloudModel && (response.status === 400 || response.status === 403 || response.status === 404)) {
+                localStorage.removeItem('plower_gemini_api_key');
+                alert(`Gemini APIエラー (${response.status}) が発生しました。\nAPIキーが無効か、入力に誤りがある可能性があります。\n保存されたキーを削除しました。もう一度「送信」ボタンを押して、正しいキーを入力し直してください。\n\n詳細: ${errorDetail.slice(0, 150)}`);
+            }
+
             throw new Error(`${errorSource} エラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} のロードまたは通信に失敗しました。詳細: ${errorDetail.slice(0, 100)}...`);
         }
 
@@ -534,7 +542,6 @@ ${context}
 
 // --- 初期化とイベントリスナー設定 ---
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Plower Script Loaded: Cloud API Version (Direct Access)");
     loadDocuments(); 
     document.getElementById('sendButton').addEventListener('click', sendToModel);
     document.getElementById('resetDocsButton').addEventListener('click', resetDocuments);
