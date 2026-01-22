@@ -421,6 +421,11 @@ ${context}
         // --- Gemini Cloud Model (Direct API Access) ---
         // Web版として動作させるため、APIキーをブラウザに入力・保存させる
         let apiKey = localStorage.getItem('plower_gemini_api_key');
+        // 既存のキーがある場合も、念のため空白除去を行う
+        if (apiKey) {
+            apiKey = apiKey.trim();
+        }
+
         if (!apiKey) {
             const inputKey = window.prompt("Gemini APIキーを入力してください（ブラウザに保存されます）:\n※Google AI Studioで取得可能です");
             if (!inputKey) {
@@ -472,8 +477,20 @@ ${context}
             
             // Gemini APIでエラーが出た場合、APIキーが無効な可能性があるためリセットする
             if (isGeminiCloudModel && (response.status === 400 || response.status === 403 || response.status === 404)) {
-                localStorage.removeItem('plower_gemini_api_key');
-                alert(`Gemini APIエラー (${response.status}) が発生しました。\nAPIキーが無効か、入力に誤りがある可能性があります。\n保存されたキーを削除しました。もう一度「送信」ボタンを押して、正しいキーを入力し直してください。\n\n詳細: ${errorDetail.slice(0, 150)}`);
+                let errorMsg = `Gemini APIエラー (${response.status}) が発生しました。\n`;
+                
+                if (response.status === 404) {
+                    // 404の場合はキーを削除せず、設定確認を促す
+                    errorMsg += "【重要】モデルが見つからないか、APIキーのプロジェクトで「Generative Language API」が有効になっていない可能性があります。\nGoogle Cloud ConsoleでAPIの有効化を確認してください。\n\nもしAPIキーを変更したい場合は「OK」を押してください。";
+                    if (confirm(errorMsg + `\n\n詳細: ${errorDetail.slice(0, 150)}`)) {
+                        localStorage.removeItem('plower_gemini_api_key');
+                    }
+                } else {
+                    // 400, 403の場合はキー無効の可能性が高いため削除
+                    localStorage.removeItem('plower_gemini_api_key');
+                    errorMsg += "\n保存されたキーを削除しました。もう一度「送信」ボタンを押して、正しいキーを入力し直してください。";
+                    alert(errorMsg + `\n\n詳細: ${errorDetail.slice(0, 150)}`);
+                }
             }
 
             throw new Error(`${errorSource} エラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} のロードまたは通信に失敗しました。詳細: ${errorDetail.slice(0, 100)}...`);
