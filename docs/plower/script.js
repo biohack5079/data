@@ -418,12 +418,24 @@ ${context}
     const isGeminiCloudModel = GEMINI_MODELS.includes(modelSelect);
     
     if (isGeminiCloudModel) {
-        // --- Gemini Cloud Model (FastAPIプロキシ経由) ---
-        endpoint = 'http://localhost:8001/api/gemini_proxy'; 
+        // --- Gemini Cloud Model (Direct API Access) ---
+        // Web版として動作させるため、APIキーをブラウザに入力・保存させる
+        let apiKey = localStorage.getItem('plower_gemini_api_key');
+        if (!apiKey) {
+            apiKey = window.prompt("Gemini APIキーを入力してください（ブラウザに保存されます）:\n※Google AI Studioで取得可能です");
+            if (!apiKey) {
+                alert("APIキーが入力されなかったため、送信を中止しました。");
+                sendButton.disabled = false;
+                sendButton.textContent = '送信';
+                return;
+            }
+            localStorage.setItem('plower_gemini_api_key', apiKey);
+        }
+
+        endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelSelect}:generateContent?key=${apiKey}`;
         bodyData = {
-            model: modelSelect, 
-            prompt: prompt,
-            temperature: 0.1
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1 }
         };
         isStreaming = false; 
 
@@ -455,7 +467,7 @@ ${context}
 
         if (!response.ok) {
             const errorDetail = await response.text();
-            const errorSource = isGeminiCloudModel ? 'FastAPIプロキシ/Gemini API' : 'Ollamaサーバー';
+            const errorSource = isGeminiCloudModel ? 'Gemini API' : 'Ollamaサーバー';
             throw new Error(`${errorSource} エラー: ${response.status} ${response.statusText}. モデル: ${modelSelect} のロードまたは通信に失敗しました。詳細: ${errorDetail.slice(0, 100)}...`);
         }
 
@@ -490,12 +502,18 @@ ${context}
         } else {
             // Gemini (非ストリーミング) 処理
             const json = await response.json();
-            if (json.response) {
+            
+            // Google Gemini APIのレスポンス形式に対応
+            if (json.candidates && json.candidates[0] && json.candidates[0].content) {
+                result = json.candidates[0].content.parts.map(p => p.text).join('');
+            } else if (json.response) {
                 result = json.response;
+            } else if (json.error) {
+                throw new Error(`Gemini API エラー: ${json.error.message}`);
             } else if (json.detail) {
-                throw new Error(`Geminiプロキシ処理エラー: ${json.detail}`);
+                throw new Error(`APIエラー: ${json.detail}`);
             } else {
-                throw new Error("FastAPIプロキシからの予期しない応答形式です。");
+                throw new Error("予期しない応答形式です。");
             }
         }
         
